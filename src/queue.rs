@@ -76,11 +76,15 @@ impl Queue {
                 .iter()
                 .position(|p| p.next_schedule_time() > process.next_schedule_time())
             {
+                // Put the process before the first process that has a later next schedule time,
+                // so that it may be scheduled earlier
                 self.processes.insert(idx, process);
             } else {
+                // The process has the latest next schedule time, put it at the end of the queue
                 self.processes.push(process);
             }
         } else {
+            // Put the process at the end of the queue, essentially performing round-robin
             self.processes.push(process);
         }
     }
