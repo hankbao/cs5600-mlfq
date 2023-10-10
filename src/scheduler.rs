@@ -3,9 +3,9 @@
 // Author: Hank Bao
 
 use crate::config::{QueueConfig, SchedulerConfig};
+use crate::job::Job;
 use crate::process::Process;
 use crate::queue::Queue;
-use crate::task::Task;
 
 pub struct Scheduler {
     queues: Vec<Queue>,
@@ -19,18 +19,18 @@ impl Scheduler {
     pub fn new(
         config: SchedulerConfig,
         queue_configs: Vec<QueueConfig>,
-        tasks: Vec<Task>,
+        jobs: Vec<Job>,
     ) -> Scheduler {
         let mut pid_counter = 0;
         let mut queues: Vec<Queue> = queue_configs.into_iter().map(Queue::from).collect();
 
-        for task in tasks {
+        for job in jobs {
             let proc = Process::new(
                 pid_counter,
-                task.io_interval(),
-                task.io_duration(),
-                task.workload(),
-                task.start_time(),
+                job.io_interval(),
+                job.io_duration(),
+                job.workload(),
+                job.start_time(),
             );
             pid_counter += 1;
 
@@ -46,13 +46,13 @@ impl Scheduler {
         }
     }
 
-    pub fn add_task(&mut self, task: Task) {
+    pub fn add_job(&mut self, job: Job) {
         let proc = Process::new(
             self.pid_counter,
-            task.io_interval(),
-            task.io_duration(),
-            task.workload(),
-            task.start_time(),
+            job.io_interval(),
+            job.io_duration(),
+            job.workload(),
+            job.start_time(),
         );
         self.pid_counter += 1;
 

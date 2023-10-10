@@ -1,17 +1,17 @@
-// task.rs
-// Task description
+// Job.rs
+// Job description
 // Author: Hank Bao
 
-pub struct Task {
+pub struct Job {
     start_time: u32,
     workload: u32,
     io_interval: u32,
     io_duration: u32,
 }
 
-impl Task {
-    pub fn new(start_time: u32, workload: u32, io_interval: u32, io_duration: u32) -> Task {
-        Task {
+impl Job {
+    pub fn new(start_time: u32, workload: u32, io_interval: u32, io_duration: u32) -> Job {
+        Job {
             start_time,
             workload,
             io_interval,

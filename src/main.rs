@@ -3,10 +3,10 @@
 // Author: Hank Bao
 
 mod config;
+mod job;
 mod process;
 mod queue;
 mod scheduler;
-mod task;
 
 fn main() {
     println!("Hello, world!");
