@@ -6,11 +6,16 @@
 pub struct QueueConfig {
     quantum: u32,
     allotment: u32,
+    push_front: bool,
 }
 
 impl QueueConfig {
-    pub fn new(quantum: u32, allotment: u32) -> QueueConfig {
-        QueueConfig { quantum, allotment }
+    pub fn new(quantum: u32, allotment: u32, push_front: bool) -> QueueConfig {
+        QueueConfig {
+            quantum,
+            allotment,
+            push_front,
+        }
     }
 
     pub fn quantum(&self) -> u32 {
@@ -19,6 +24,10 @@ impl QueueConfig {
 
     pub fn allotment(&self) -> u32 {
         self.allotment
+    }
+
+    pub fn push_front(&self) -> bool {
+        self.push_front
     }
 }
 

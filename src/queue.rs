@@ -8,16 +8,16 @@ use crate::process::Process;
 pub struct Queue {
     quantum: u32,
     allotment: u32,
-    new_process_first: bool,
+    push_front: bool,
     processes: Vec<Process>,
 }
 
 impl Queue {
-    pub fn new(quantum: u32, allotment: u32, new_process_first: bool) -> Queue {
+    pub fn new(quantum: u32, allotment: u32, push_front: bool) -> Queue {
         Queue {
             quantum,
             allotment,
-            new_process_first,
+            push_front,
             processes: Vec::new(),
         }
     }
@@ -46,7 +46,7 @@ impl Queue {
         // Update the allotment of the process when adding it to the queue
         process.set_allotment(self.allotment);
 
-        if self.new_process_first {
+        if self.push_front {
             self.processes.insert(0, process);
         } else {
             self.processes.push(process);
@@ -92,7 +92,6 @@ impl Queue {
 
 impl From<QueueConfig> for Queue {
     fn from(config: QueueConfig) -> Self {
-        // FIXME: add new_process_first to QueueConfig
-        Queue::new(config.quantum(), config.allotment(), true)
+        Queue::new(config.quantum(), config.allotment(), config.push_front())
     }
 }
