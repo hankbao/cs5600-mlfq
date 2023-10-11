@@ -1,5 +1,5 @@
 // process.rs
-// Process struct and implementation.
+// Process struct as the process control block
 // Author: Hank Bao
 
 pub struct Process {
@@ -8,7 +8,10 @@ pub struct Process {
     io_duration: u32,
     workload: u32,
     work_done: u32,
+    arrival_time: u32,
     next_schedule_time: u32,
+    turnaround_time: u32,
+    response_time: u32,
     allotment: u32,
     state: ProcessState,
 }
@@ -19,7 +22,7 @@ impl Process {
         io_interval: u32,
         io_duration: u32,
         workload: u32,
-        start_time: u32,
+        arrival_time: u32,
     ) -> Process {
         Process {
             pid,
@@ -27,7 +30,10 @@ impl Process {
             io_duration,
             workload,
             work_done: 0,
-            next_schedule_time: start_time,
+            arrival_time,
+            next_schedule_time: arrival_time,
+            turnaround_time: 0,
+            response_time: 0,
             allotment: 0,
             state: ProcessState::Ready,
         }
@@ -53,8 +59,20 @@ impl Process {
         self.work_done
     }
 
+    pub fn arrival_time(&self) -> u32 {
+        self.arrival_time
+    }
+
     pub fn next_schedule_time(&self) -> u32 {
         self.next_schedule_time
+    }
+
+    pub fn turnaround_time(&self) -> u32 {
+        self.turnaround_time
+    }
+
+    pub fn response_time(&self) -> u32 {
+        self.response_time
     }
 
     pub fn set_allotment(&mut self, allotment: u32) {
@@ -80,6 +98,12 @@ impl Process {
     }
 
     pub fn run(&mut self, quantum: u32, at: u32) -> u32 {
+        // record the response time
+        if self.response_time == 0 {
+            assert!(at >= self.arrival_time);
+            self.response_time = at - self.arrival_time;
+        }
+
         match self.state {
             ProcessState::Ready => self.run_from_ready(quantum, at),
             ProcessState::Running => self.run_from_running(quantum, at),
@@ -106,6 +130,7 @@ impl Process {
             run_time = self.workload - self.work_done;
             self.work_done = self.workload;
             self.next_schedule_time = u32::MAX;
+            self.turnaround_time = at - self.arrival_time + run_time;
             self.state = ProcessState::Finished;
         } else {
             // Check if the process is going to do IO before the quantum is up
