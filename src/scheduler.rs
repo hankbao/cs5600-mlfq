@@ -10,9 +10,13 @@ use crate::queue::Queue;
 pub struct Scheduler {
     queues: Vec<Queue>,
     current_time: u32,
+    last_boost_time: u32,
     config: SchedulerConfig,
     pid_counter: u32,
     idle_counter: u32,
+    idle_total: u32,
+    turnaround_total: u32,
+    response_total: u32,
 }
 
 impl Scheduler {
@@ -30,7 +34,7 @@ impl Scheduler {
                 job.io_interval(),
                 job.io_duration(),
                 job.workload(),
-                job.start_time(),
+                job.arrival_time(),
             );
             pid_counter += 1;
 
@@ -40,9 +44,13 @@ impl Scheduler {
         Scheduler {
             queues,
             current_time: 0,
+            last_boost_time: 0,
             config,
             pid_counter,
             idle_counter: 0,
+            idle_total: 0,
+            turnaround_total: 0,
+            response_total: 0,
         }
     }
 
@@ -52,11 +60,27 @@ impl Scheduler {
             job.io_interval(),
             job.io_duration(),
             job.workload(),
-            job.start_time(),
+            job.arrival_time(),
         );
         self.pid_counter += 1;
 
         self.queues[0].add_process(proc);
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.queues.iter().all(|q| q.is_empty())
+    }
+
+    pub fn total_idle_time(&self) -> u32 {
+        self.idle_total
+    }
+
+    pub fn average_turnaround_time(&self) -> u32 {
+        self.turnaround_total / (self.pid_counter + 1)
+    }
+
+    pub fn average_response_time(&self) -> u32 {
+        self.response_total / (self.pid_counter + 1)
     }
 
     // Based on the MLFQ rules described in "Operating Systems: Three Easy Pieces"
@@ -66,21 +90,10 @@ impl Scheduler {
     // 3. When a job enters the system, it is placed at the highest priority (the topmost queue).
     // 4. Once a job uses up its time allotment at a given level, its priority is reduced
     // 5. After some time period S, move all the jobs in the system to the topmost queue.
-    pub fn run_step(&mut self) {
-        let priority_boost_interval = self.config.priority_boost_interval();
-        let io_bump = self.config.io_bump();
-        let io_stay = self.config.io_stay();
-
+    pub fn run_tick(&mut self) {
         // Check if we need to do a priority boost
-        if self.current_time % priority_boost_interval == 0 {
-            println!("Priority boost at time {}.", self.current_time);
-
-            for i in 1..self.queues.len() {
-                let q = self.queues[i].pop_all();
-                for p in q {
-                    self.queues[0].add_process(p);
-                }
-            }
+        if self.current_time - self.last_boost_time >= self.config.priority_boost_interval() {
+            self.priority_boost();
         }
 
         // Find the next schedulable process
@@ -96,11 +109,17 @@ impl Scheduler {
                 self.current_time += run_time;
 
                 if process.is_finished() {
-                    // Process finished, do nothing as it has already been removed from the queue
+                    // Process finished, print its response time & turnaround time
+                    println!(
+                        "Process {} finished. Response time: {}. Turnaround time: {}.",
+                        process.pid(),
+                        process.response_time(),
+                        process.turnaround_time()
+                    );
                 } else {
                     // Rule 4, reduce the priority of the process
                     let pid = process.pid();
-                    let do_io_stay = io_stay && process.is_blocked();
+                    let do_io_stay = self.config.io_stay() && process.is_blocked();
 
                     if process.allotment() == 0 && !do_io_stay && index < self.queues.len() - 1 {
                         // reset the next schedule time for the process
@@ -112,7 +131,7 @@ impl Scheduler {
                             println!("Process {} stay in queue {} after I/O.", pid, index);
                         }
 
-                        let do_io_bump = io_bump && process.is_blocked();
+                        let do_io_bump = self.config.io_bump() && process.is_blocked();
                         self.queues[index].put_process_back(process, do_io_bump);
 
                         if do_io_bump {
@@ -123,12 +142,22 @@ impl Scheduler {
             }
         } else {
             self.idle_counter += 1;
+            self.idle_total += 1;
             self.current_time += 1;
         }
     }
 
-    fn is_finished(&self) -> bool {
-        self.queues.iter().all(|q| q.is_empty())
+    fn priority_boost(&mut self) {
+        println!("Priority boost at time {}.", self.current_time);
+
+        for i in 1..self.queues.len() {
+            let q = self.queues[i].pop_all();
+            for p in q {
+                self.queues[0].add_process(p);
+            }
+        }
+
+        self.last_boost_time = self.current_time;
     }
 
     fn find_runnable_queue(&self) -> Option<usize> {
