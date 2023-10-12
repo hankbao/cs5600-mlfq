@@ -2,8 +2,7 @@
 // Scheduler for the Multi-Level Feedback Queue (MLFQ) scheduling algorithm.
 // Author: Hank Bao
 
-use crate::config::{QueueConfig, SchedulerConfig};
-use crate::job::Job;
+use crate::config::{JobConfig, QueueConfig, SchedulerConfig};
 use crate::process::Process;
 use crate::queue::Queue;
 
@@ -23,7 +22,7 @@ impl Scheduler {
     pub fn new(
         config: SchedulerConfig,
         queue_configs: Vec<QueueConfig>,
-        jobs: Vec<Job>,
+        jobs: Vec<JobConfig>,
     ) -> Scheduler {
         let mut pid_counter = 0;
         let mut queues: Vec<Queue> = queue_configs.into_iter().map(Queue::from).collect();
@@ -54,7 +53,7 @@ impl Scheduler {
         }
     }
 
-    pub fn add_job(&mut self, job: Job) {
+    pub fn add_job(&mut self, job: JobConfig) {
         let proc = Process::new(
             self.pid_counter,
             job.io_interval(),
@@ -92,8 +91,8 @@ impl Scheduler {
     // 5. After some time period S, move all the jobs in the system to the topmost queue.
     pub fn run_tick(&mut self) {
         // Check if we need to do a priority boost
-        if self.current_time - self.last_boost_time >= self.config.priority_boost_interval() {
-            self.priority_boost();
+        if self.priority_boost_check() {
+            self.do_priority_boost();
         }
 
         // Find the next schedulable process
@@ -147,7 +146,19 @@ impl Scheduler {
         }
     }
 
-    fn priority_boost(&mut self) {
+    fn priority_boost_check(&self) -> bool {
+        let interval = self.config.priority_boost_interval();
+        if interval == 0 {
+            return false;
+        }
+
+        let time_since_last_boost = self.current_time - self.last_boost_time;
+        assert!(time_since_last_boost > 0);
+
+        time_since_last_boost >= interval
+    }
+
+    fn do_priority_boost(&mut self) {
         println!("Priority boost at time {}.", self.current_time);
 
         for i in 1..self.queues.len() {

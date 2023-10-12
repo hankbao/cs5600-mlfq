@@ -8,7 +8,7 @@ pub struct Process {
     io_duration: u32,
     workload: u32,
     work_done: u32,
-    arrival_time: u32,
+    start_time: u32,
     next_schedule_time: u32,
     turnaround_time: u32,
     response_time: u32,
@@ -30,7 +30,7 @@ impl Process {
             io_duration,
             workload,
             work_done: 0,
-            arrival_time,
+            start_time: arrival_time,
             next_schedule_time: arrival_time,
             turnaround_time: 0,
             response_time: 0,
@@ -59,8 +59,8 @@ impl Process {
         self.work_done
     }
 
-    pub fn arrival_time(&self) -> u32 {
-        self.arrival_time
+    pub fn start_time(&self) -> u32 {
+        self.start_time
     }
 
     pub fn next_schedule_time(&self) -> u32 {
@@ -100,8 +100,8 @@ impl Process {
     pub fn run(&mut self, quantum: u32, at: u32) -> u32 {
         // record the response time
         if self.response_time == 0 {
-            assert!(at >= self.arrival_time);
-            self.response_time = at - self.arrival_time;
+            assert!(at >= self.start_time);
+            self.response_time = at - self.start_time;
         }
 
         match self.state {
@@ -130,7 +130,7 @@ impl Process {
             run_time = self.workload - self.work_done;
             self.work_done = self.workload;
             self.next_schedule_time = u32::MAX;
-            self.turnaround_time = at - self.arrival_time + run_time;
+            self.turnaround_time = at - self.start_time + run_time;
             self.state = ProcessState::Finished;
         } else {
             // Check if the process is going to do IO before the quantum is up
