@@ -7,50 +7,32 @@ mod process;
 mod queue;
 mod scheduler;
 
+use clap::Parser;
 use std::process::ExitCode;
 
-use clap::Parser;
-
 use config::{JobConfig, QueueConfig, SchedulerConfig};
+use scheduler::Scheduler;
 
-use crate::scheduler::Scheduler;
-
-/// Options:
-///   -q QUANTUMS, --quantum_list=QUANTUMS
-///                         length of time slice per queue level, specified as
-///                         x,y,z,... where x is the quantum length for the
-///                         highest priority queue, y the next highest, and so
-///                         forth
-///   -a ALLOTMENTS, --allotment_list=ALLOTMENTS
-///                         length of time allotment per queue level, specified as
-///                         x,y,z,... where x is the # of time slices for the
-///                         highest priority queue, y the next highest, and so
-///                         forth
-///   -l JOBS, --job_list=JOBS
-///                         a comma-separated list of jobs to run, in the form
-///                         x1,y1,z1,u4:x2,y2,z2,u2:... where x is start time, y is run
-///                         time, and z is how often the job issues an I/O request,
-///                         and u is how long the I/O request lasts
-///   -b BOOST, --boost=BOOST
-///                         how often to boost the priority of all jobs back to
-///                         high priority
-///   -s, --stay            reset and stay at same priority level when issuing I/O
-///   -i, --io_bump         if specified, jobs that finished I/O move immediately
-///                         to front of current queue
-///   -h, --help            show this help message and exit
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
+#[command(arg_required_else_help = true)]
 struct Args {
+    /// Length of time slice per queue level, specified as x,y,z,... where x is the quantum length for the highest priority queue, y the next highest, and so forth
     #[arg(short, long, value_name = "QUANTUMS")]
     quantum_list: String,
+    /// Length of time allotment per queue level, specified as x,y,z,... where x is the # of time slices for the highest priority queue, y the next highest, and so forth
     #[arg(short, long, value_name = "ALLOTMENTS")]
     allotment_list: String,
+    /// A comma-separated list of jobs to run, in the form x1,y1,z1,u1:x2,y2,z2,u2:... where x is start time, y is run time, and z is how often the job issues an I/O request, and u is how long the I/O request lasts
     #[arg(short, long, value_name = "JOBS")]
     job_list: String,
+    /// How often to boost the priority of all jobs back to high priority
     #[arg(short, long, value_name = "BOOST", default_value = "0")]
     boost: u32,
+    /// If specified, jobs that finished I/O move immediately to front of current queue
     #[arg(short, long, default_value = "false")]
     io_bump: bool,
+    /// Reset and stay at same priority level when issuing I/O
     #[arg(short, long, default_value = "false")]
     stay: bool,
 }
@@ -82,7 +64,7 @@ fn main() -> ExitCode {
                 scheduler.run_tick();
             }
 
-            println!("All jobs finished.");
+            println!("All processes finished.");
             println!("Total idle time: {}.", scheduler.total_idle_time());
             println!(
                 "Average turnaround time: {}.",
