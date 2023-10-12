@@ -19,37 +19,23 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
-    pub fn new(
-        config: SchedulerConfig,
-        queue_configs: Vec<QueueConfig>,
-        jobs: Vec<JobConfig>,
-    ) -> Scheduler {
-        let mut pid_counter = 0;
-        let mut queues: Vec<Queue> = queue_configs.into_iter().map(Queue::from).collect();
-
-        for job in jobs {
-            let proc = Process::new(
-                pid_counter,
-                job.io_interval(),
-                job.io_duration(),
-                job.workload(),
-                job.arrival_time(),
-            );
-            pid_counter += 1;
-
-            queues[0].add_process(proc);
-        }
-
+    pub fn new(config: SchedulerConfig, queue_configs: Vec<QueueConfig>) -> Scheduler {
         Scheduler {
-            queues,
+            queues: queue_configs.into_iter().map(Queue::from).collect(),
             current_time: 0,
             last_boost_time: 0,
             config,
-            pid_counter,
+            pid_counter: 0,
             idle_counter: 0,
             idle_total: 0,
             turnaround_total: 0,
             response_total: 0,
+        }
+    }
+
+    pub fn add_jobs(&mut self, jobs: Vec<JobConfig>) {
+        for job in jobs {
+            self.add_job(job);
         }
     }
 
