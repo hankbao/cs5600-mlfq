@@ -7,15 +7,15 @@ mod process;
 mod queue;
 mod scheduler;
 
-use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::Parser;
 
 use config::{JobConfig, QueueConfig, SchedulerConfig};
 
+use crate::scheduler::Scheduler;
+
 /// Options:
-///   -c CONFIG, --config=CONFIG
 ///   -q QUANTUMS, --quantum_list=QUANTUMS
 ///                         length of time slice per queue level, specified as
 ///                         x,y,z,... where x is the quantum length for the
@@ -58,60 +58,40 @@ struct Args {
 fn main() -> ExitCode {
     match Args::try_parse() {
         Ok(args) => {
-            let interval = args.boost;
-            let io_bump = args.io_bump;
-            let io_stay = args.stay;
+            let scheduler_config = match parse_scheduler_config(args.boost, args.io_bump, args.stay)
+            {
+                Some(config) => config,
+                None => return ExitCode::FAILURE,
+            };
 
-            let scheduler_config = SchedulerConfig::new(interval, io_bump, io_stay);
+            let queue_config = match parse_queue_configs(args.quantum_list, args.allotment_list) {
+                Some(config) => config,
+                None => return ExitCode::FAILURE,
+            };
 
-            let quantum_list = args
-                .quantum_list
-                .split(',')
-                .map(|x| x.parse::<u32>().unwrap())
-                .collect::<Vec<u32>>();
+            let job_configs = match parse_job_configs(args.job_list) {
+                Some(config) => config,
+                None => return ExitCode::FAILURE,
+            };
 
-            let allotment_list = args
-                .allotment_list
-                .split(',')
-                .map(|x| x.parse::<u32>().unwrap())
-                .collect::<Vec<u32>>();
+            let mut scheduler = Scheduler::new(scheduler_config, queue_config);
+            scheduler.add_jobs(job_configs);
 
-            if quantum_list.len() != allotment_list.len() {
-                eprintln!("quantum_list and allotment_list must have the same length");
-                return ExitCode::FAILURE;
+            // let the scheduler ticks
+            while !scheduler.is_finished() {
+                scheduler.run_tick();
             }
 
-            let push_front = true; // FIXME: make this configurable
-            let queue_config = std::iter::zip(quantum_list, allotment_list)
-                .map(|(quantum, allotment)| QueueConfig::new(quantum, allotment, push_front))
-                .collect::<Vec<QueueConfig>>();
-
-            let job_list = args
-                .job_list
-                .split(':')
-                .map(|s| {
-                    s.split(',')
-                        .map(|x| x.parse::<u32>().unwrap())
-                        .collect::<Vec<u32>>()
-                })
-                .collect::<Vec<Vec<u32>>>();
-
-            let mut all_job_valid = true;
-            for job in job_list.as_ref() {
-                if job.len() != 4 {
-                    all_job_valid = false;
-                    break;
-                }
-            }
-            if !all_job_valid {
-                eprintln!("job_list must be in the form x1,y1,z1,u1:x2,y2,z2,u2:...");
-                return ExitCode::FAILURE;
-            }
-
-            let job_configs = job_list
-                .iter()
-                .map(|job| JobConfig::new(job[0], job[1], job[2], job[3]))
-                .collect::<Vec<JobConfig>>();
+            println!("All jobs finished.");
+            println!("Total idle time: {}.", scheduler.total_idle_time());
+            println!(
+                "Average turnaround time: {}.",
+                scheduler.average_turnaround_time()
+            );
+            println!(
+                "Average response time: {}.",
+                scheduler.average_response_time()
+            );
 
             ExitCode::SUCCESS
         }
@@ -120,4 +100,106 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+fn parse_scheduler_config(
+    priority_boost_interval: u32,
+    io_bump: bool,
+    io_stay: bool,
+) -> Option<SchedulerConfig> {
+    Some(SchedulerConfig::new(
+        priority_boost_interval,
+        io_bump,
+        io_stay,
+    ))
+}
+
+fn parse_queue_configs(quantums: String, allotments: String) -> Option<Vec<QueueConfig>> {
+    let mut all_quantum_valid = true;
+    let quantum_list = quantums
+        .split(',')
+        .map(|x| match x.parse::<u32>() {
+            Ok(x) => x,
+            Err(_) => {
+                all_quantum_valid = false;
+                0
+            }
+        })
+        .collect::<Vec<u32>>();
+
+    if !all_quantum_valid {
+        eprintln!("Invalid value found in quantum_list.");
+        return None;
+    }
+
+    let mut all_allotment_valid = true;
+    let allotment_list = allotments
+        .split(',')
+        .map(|x| match x.parse::<u32>() {
+            Ok(x) => x,
+            Err(_) => {
+                all_allotment_valid = false;
+                0
+            }
+        })
+        .collect::<Vec<u32>>();
+
+    if !all_allotment_valid {
+        eprintln!("Invalid value found in allotment_list.");
+        return None;
+    }
+
+    if quantum_list.len() != allotment_list.len() {
+        eprintln!("quantum_list and allotment_list must have the same length");
+        return None;
+    }
+
+    let push_front = true; // FIXME: make this configurable
+    let queue_config = std::iter::zip(quantum_list, allotment_list)
+        .map(|(quantum, allotment)| QueueConfig::new(quantum, allotment, push_front))
+        .collect::<Vec<QueueConfig>>();
+
+    Some(queue_config)
+}
+
+fn parse_job_configs(jobs: String) -> Option<Vec<JobConfig>> {
+    let mut all_job_valid = true;
+
+    let job_list = jobs
+        .split(':')
+        .map(|s| {
+            s.split(',')
+                .map(|x| match x.parse::<u32>() {
+                    Ok(x) => x,
+                    Err(_) => {
+                        all_job_valid = false;
+                        0
+                    }
+                })
+                .collect::<Vec<u32>>()
+        })
+        .collect::<Vec<Vec<u32>>>();
+
+    if !all_job_valid {
+        eprintln!("Invalid value found in job_list.");
+        return None;
+    }
+
+    for job in job_list.iter() {
+        if job.len() != 4 {
+            all_job_valid = false;
+            break;
+        }
+    }
+    if !all_job_valid {
+        eprintln!("job_list must be in the form x1,y1,z1,u1:x2,y2,z2,u2:...");
+        return None;
+    }
+
+    let job_configs = job_list
+        .iter()
+        .map(|job| JobConfig::new(job[0], job[1], job[2], job[3]))
+        .collect::<Vec<JobConfig>>();
+
+    Some(job_configs)
 }
