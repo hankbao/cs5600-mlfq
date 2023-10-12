@@ -43,7 +43,7 @@ impl Scheduler {
         let proc = Process::new(
             self.pid_counter,
             job.io_interval(),
-            job.io_duration(),
+            job.io_length(),
             job.workload(),
             job.arrival_time(),
         );
@@ -61,11 +61,11 @@ impl Scheduler {
     }
 
     pub fn average_turnaround_time(&self) -> u32 {
-        self.turnaround_total / (self.pid_counter + 1)
+        self.turnaround_total / self.pid_counter
     }
 
     pub fn average_response_time(&self) -> u32 {
-        self.response_total / (self.pid_counter + 1)
+        self.response_total / self.pid_counter
     }
 
     // Based on the MLFQ rules described in "Operating Systems: Three Easy Pieces"
@@ -90,7 +90,7 @@ impl Scheduler {
                 self.idle_counter = 0;
 
                 let quantum = self.queues[index].quantum();
-                let run_time = process.run(quantum, self.current_time);
+                let run_time = process.run(quantum, self.current_time, index);
                 self.current_time += run_time;
 
                 if process.is_finished() {
@@ -101,6 +101,9 @@ impl Scheduler {
                         process.response_time(),
                         process.turnaround_time()
                     );
+
+                    self.turnaround_total += process.turnaround_time();
+                    self.response_total += process.response_time();
                 } else {
                     // Rule 4, reduce the priority of the process
                     let pid = process.pid();
@@ -138,15 +141,10 @@ impl Scheduler {
             return false;
         }
 
-        let time_since_last_boost = self.current_time - self.last_boost_time;
-        assert!(time_since_last_boost > 0);
-
-        time_since_last_boost >= interval
+        self.current_time - self.last_boost_time >= interval
     }
 
     fn do_priority_boost(&mut self) {
-        println!("Priority boost at time {}.", self.current_time);
-
         for i in 1..self.queues.len() {
             let q = self.queues[i].pop_all();
             for p in q {

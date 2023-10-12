@@ -5,7 +5,7 @@
 pub struct Process {
     pid: u32,
     io_interval: u32,
-    io_duration: u32,
+    io_length: u32,
     workload: u32,
     work_done: u32,
     start_time: u32,
@@ -21,14 +21,14 @@ impl Process {
     pub fn new(
         pid: u32,
         io_interval: u32,
-        io_duration: u32,
+        io_length: u32,
         workload: u32,
         arrival_time: u32,
     ) -> Process {
         Process {
             pid,
             io_interval,
-            io_duration,
+            io_length,
             workload,
             work_done: 0,
             start_time: arrival_time,
@@ -48,8 +48,8 @@ impl Process {
         self.io_interval
     }
 
-    pub fn io_duration(&self) -> u32 {
-        self.io_duration
+    pub fn io_length(&self) -> u32 {
+        self.io_length
     }
 
     pub fn workload(&self) -> u32 {
@@ -98,7 +98,7 @@ impl Process {
         }
     }
 
-    pub fn run(&mut self, quantum: u32, at: u32) -> u32 {
+    pub fn run(&mut self, quantum: u32, at: u32, queue: usize) -> u32 {
         // record the response time
         if self.response_time == 0 {
             assert!(at >= self.start_time);
@@ -106,47 +106,63 @@ impl Process {
         }
 
         match self.state {
-            ProcessState::Ready => self.run_from_ready(quantum, at),
-            ProcessState::Running => self.run_from_running(quantum, at),
-            ProcessState::Blocked => self.run_from_blocked(quantum, at),
+            ProcessState::Ready => self.run_from_ready(quantum, at, queue),
+            ProcessState::Running => self.run_from_running(quantum, at, queue),
+            ProcessState::Blocked => self.run_from_blocked(quantum, at, queue),
             ProcessState::Finished => panic!("Run a finished process {}.", self.pid),
         }
     }
 
-    fn run_from_ready(&mut self, quantum: u32, at: u32) -> u32 {
+    fn run_from_ready(&mut self, quantum: u32, at: u32, queue: usize) -> u32 {
         self.state = ProcessState::Running;
         println!("Process {} start running.", self.pid);
 
-        self.run_from_running(quantum, at)
+        self.run_from_running(quantum, at, queue)
     }
 
-    fn run_from_running(&mut self, quantum: u32, at: u32) -> u32 {
+    fn run_from_running(&mut self, quantum: u32, at: u32, queue: usize) -> u32 {
         assert_eq!(self.state, ProcessState::Running);
         assert!(self.allotment > 0);
 
         let run_time: u32; // actual run time
+        let work_left = self.workload - self.work_done; // work left
 
-        // Do work
-        if self.workload - self.work_done <= quantum {
-            run_time = self.workload - self.work_done;
-            self.work_done = self.workload;
-            self.next_schedule_time = u32::MAX;
-            self.turnaround_time = at - self.start_time + run_time;
-            self.state = ProcessState::Finished;
-        } else {
+        if self.io_interval > 0 {
             // Check if the process is going to do I/O before the quantum is up
-            let work_before_io = self.work_done % self.io_interval;
-            if work_before_io <= quantum {
+            let work_before_io = self.io_interval - (self.work_done % self.io_interval);
+            if work_before_io < work_left && work_before_io <= quantum {
                 run_time = work_before_io;
                 self.work_done += run_time;
-                self.next_schedule_time = at + self.io_duration;
+                self.next_schedule_time = at + self.io_length;
                 self.state = ProcessState::Blocked;
+            } else if work_left <= quantum {
+                run_time = work_left;
+                self.work_done += run_time;
+                self.next_schedule_time = u32::MAX;
+                self.turnaround_time = at - self.start_time + run_time;
+                self.state = ProcessState::Finished;
+                assert!(self.workload == self.work_done);
             } else {
                 run_time = quantum;
-                self.work_done += quantum;
+                self.work_done += run_time;
+                self.next_schedule_time = at + quantum;
+            }
+        } else {
+            if work_left <= quantum {
+                run_time = work_left;
+                self.work_done += run_time;
+                self.next_schedule_time = u32::MAX;
+                self.turnaround_time = at - self.start_time + run_time;
+                self.state = ProcessState::Finished;
+                assert!(self.workload == self.work_done);
+            } else {
+                run_time = quantum;
+                self.work_done += run_time;
                 self.next_schedule_time = at + quantum;
             }
         }
+
+        assert!(run_time > 0);
 
         // Update allotment
         if run_time < self.allotment {
@@ -172,11 +188,11 @@ impl Process {
         run_time
     }
 
-    fn run_from_blocked(&mut self, quantum: u32, at: u32) -> u32 {
+    fn run_from_blocked(&mut self, quantum: u32, at: u32, queue: usize) -> u32 {
         self.state = ProcessState::Running;
         println!("Process {} resume running from I/O.", self.pid);
 
-        self.run_from_running(quantum, at)
+        self.run_from_running(quantum, at, queue)
     }
 }
 

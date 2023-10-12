@@ -36,16 +36,16 @@ pub struct JobConfig {
     arrival_time: u32,
     workload: u32,
     io_interval: u32,
-    io_duration: u32,
+    io_length: u32,
 }
 
 impl JobConfig {
-    pub fn new(arrival_time: u32, workload: u32, io_interval: u32, io_duration: u32) -> JobConfig {
+    pub fn new(arrival_time: u32, workload: u32, io_interval: u32, io_length: u32) -> JobConfig {
         JobConfig {
             arrival_time,
             workload,
             io_interval,
-            io_duration,
+            io_length,
         }
     }
 
@@ -57,8 +57,8 @@ impl JobConfig {
         self.workload
     }
 
-    pub fn io_duration(&self) -> u32 {
-        self.io_duration
+    pub fn io_length(&self) -> u32 {
+        self.io_length
     }
 
     pub fn io_interval(&self) -> u32 {
