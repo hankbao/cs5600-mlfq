@@ -16,6 +16,7 @@ pub struct Process {
     state: ProcessState,
 }
 
+#[allow(dead_code)]
 impl Process {
     pub fn new(
         pid: u32,

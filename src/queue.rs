@@ -30,10 +30,6 @@ impl Queue {
         self.allotment
     }
 
-    pub fn number_of_processes(&self) -> usize {
-        self.processes.len()
-    }
-
     pub fn is_empty(&self) -> bool {
         self.processes.is_empty()
     }
@@ -44,7 +40,7 @@ impl Queue {
 
     pub fn add_process(&mut self, mut process: Process) {
         // Update the allotment of the process when adding it to the queue
-        process.set_allotment(self.allotment);
+        process.set_allotment(self.allotment());
 
         if self.push_front {
             self.processes.insert(0, process);
