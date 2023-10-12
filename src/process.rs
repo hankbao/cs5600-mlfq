@@ -133,7 +133,7 @@ impl Process {
             self.turnaround_time = at - self.start_time + run_time;
             self.state = ProcessState::Finished;
         } else {
-            // Check if the process is going to do IO before the quantum is up
+            // Check if the process is going to do I/O before the quantum is up
             let work_before_io = self.work_done % self.io_interval;
             if work_before_io <= quantum {
                 run_time = work_before_io;
