@@ -86,8 +86,13 @@ impl Scheduler {
             let process = self.queues[index].take_next_schedulable_process(self.current_time);
 
             if let Some(mut process) = process {
-                println!("CPU idle for {} ticks.", self.idle_counter);
-                self.idle_counter = 0;
+                if self.idle_counter > 0 {
+                    println!(
+                        "[{}:<S>] CPU idle for {} ticks.",
+                        self.current_time, self.idle_counter
+                    );
+                    self.idle_counter = 0;
+                }
 
                 let quantum = self.queues[index].quantum();
                 let run_time = process.run(quantum, self.current_time, index);
@@ -96,7 +101,8 @@ impl Scheduler {
                 if process.is_finished() {
                     // Process finished, print its response time & turnaround time
                     println!(
-                        "Process {} finished. Response time: {}. Turnaround time: {}.",
+                        "[{}:<S>] Process {} finished. Response time: {}. Turnaround time: {}.",
+                        self.current_time,
                         process.pid(),
                         process.response_time(),
                         process.turnaround_time()
@@ -113,17 +119,28 @@ impl Scheduler {
                         // reset the next schedule time for the process
                         self.queues[index + 1].add_process(process);
 
-                        println!("Process {} priority reduced to {}.", pid, index + 1);
+                        println!(
+                            "[{}:<S>] Process {} priority reduced to {}.",
+                            self.current_time,
+                            pid,
+                            index + 1
+                        );
                     } else {
                         if do_io_stay {
-                            println!("Process {} stay in queue {} after I/O.", pid, index);
+                            println!(
+                                "[{}:<{}>] Process {} stay after I/O.",
+                                self.current_time, index, pid,
+                            );
                         }
 
                         let do_io_bump = self.config.io_bump() && process.is_blocked();
                         self.queues[index].put_process_back(process, do_io_bump);
 
                         if do_io_bump {
-                            println!("Process {} bumped in queue {} after I/O.", pid, index);
+                            println!(
+                                "[{}:<{}>] Process {} bumped after I/O.",
+                                self.current_time, index, pid,
+                            );
                         }
                     }
                 }
@@ -153,6 +170,11 @@ impl Scheduler {
         }
 
         self.last_boost_time = self.current_time;
+
+        println!(
+            "[{}:<S>] Priority boosted for all processes.",
+            self.current_time
+        );
     }
 
     fn find_runnable_queue(&self) -> Option<usize> {

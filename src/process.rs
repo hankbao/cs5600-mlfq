@@ -115,7 +115,7 @@ impl Process {
 
     fn run_from_ready(&mut self, quantum: u32, at: u32, queue: usize) -> u32 {
         self.state = ProcessState::Running;
-        println!("Process {} start running.", self.pid);
+        println!("[{}:<{}>] Process {} start running.", at, queue, self.pid);
 
         self.run_from_running(quantum, at, queue)
     }
@@ -173,14 +173,29 @@ impl Process {
 
         // Print status
         match self.state {
-            ProcessState::Running => println!("Process {} run for {}.", self.pid, run_time),
+            ProcessState::Running => {
+                println!(
+                    "[{}:<{}>] Process {} has run for {}.",
+                    at + run_time,
+                    queue,
+                    self.pid,
+                    run_time
+                )
+            }
             ProcessState::Blocked => println!(
-                "Process {} blocked after running for {}. It will perform I/O for {}",
-                self.pid, run_time, self.io_duration
+                "[{}:<{}>] Process {} has run for {}, then blocked. It will perform I/O for {}",
+                at + run_time,
+                queue,
+                self.pid,
+                run_time,
+                self.io_length
             ),
             ProcessState::Finished => println!(
-                "Process {} finished after running for {}.",
-                self.pid, run_time
+                "[{}:<{}>] Process {} has run for {}, then finished.",
+                at + run_time,
+                queue,
+                self.pid,
+                run_time
             ),
             _ => panic!("Process {} is in an invalid state.", self.pid),
         }
@@ -190,7 +205,10 @@ impl Process {
 
     fn run_from_blocked(&mut self, quantum: u32, at: u32, queue: usize) -> u32 {
         self.state = ProcessState::Running;
-        println!("Process {} resume running from I/O.", self.pid);
+        println!(
+            "[{}:<{}>] Process {} resume running from I/O.",
+            at, queue, self.pid
+        );
 
         self.run_from_running(quantum, at, queue)
     }
